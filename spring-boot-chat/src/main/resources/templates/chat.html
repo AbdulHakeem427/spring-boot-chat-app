@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Real-Time Chat App</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.1/stomp.min.js"></script>
+    <style>
+        body {
+            background: linear-gradient(to right, #dfe9f3, #ffffff);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #chat {
+            height: 400px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        .message-bubble {
+            padding: 10px 15px;
+            margin-bottom: 10px;
+            border-radius: 20px;
+            display: inline-block;
+            max-width: 80%;
+            transition: all 0.3s ease-in-out;
+        }
+
+        .message-sent {
+            background-color: #dcf8c6;
+            align-self: flex-end;
+            text-align: right;
+        }
+
+        .message-received {
+            background-color: #e9ecef;
+            text-align: left;
+        }
+
+        .message-container {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-input-container {
+            position: sticky;
+            bottom: 0;
+            background-color: #fff;
+            padding: 15px 0;
+            z-index: 1000;
+        }
+
+        .sender-name {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+<div class="container mt-4">
+    <h2 class="text-center mb-4">💬 Real-Time Chat</h2>
+
+    <div id="chat" class="message-container mb-3 border"></div>
+
+    <div class="chat-input-container">
+        <div class="row g-2">
+            <div class="col-md-3">
+                <input id="senderInput" type="text" class="form-control" placeholder="Your name" />
+            </div>
+            <div class="col-md-7">
+                <input id="messageInput" type="text" class="form-control" placeholder="Type your message..." />
+            </div>
+            <div class="col-md-2">
+                <button id="sendMessage" class="btn btn-success w-100" disabled>Send 🚀</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let stompClient = null;
+    let senderName = "";
+
+    function setConnected(connected) {
+        document.getElementById('sendMessage').disabled = !connected;
+    }
+
+    function showMessage(message) {
+        const chat = document.getElementById('chat');
+        const bubble = document.createElement('div');
+        bubble.classList.add('message-bubble');
+
+        // Determine if it's the sender's own message
+        const isSelf = message.sender === senderName;
+        bubble.classList.add(isSelf ? 'message-sent' : 'message-received');
+
+        bubble.innerHTML = `<span class="sender-name">${message.sender}:</span> ${message.content}`;
+        chat.appendChild(bubble);
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    function connect() {
+        const socket = new SockJS('/chat');
+        stompClient = Stomp.over(socket);
+        stompClient.connect({}, function (frame) {
+            setConnected(true);
+            stompClient.subscribe('/topic/messages', function (messageOutput) {
+                showMessage(JSON.parse(messageOutput.body));
+            });
+        });
+    }
+
+    function sendMessage() {
+        senderName = document.getElementById('senderInput').value.trim();
+        const content = document.getElementById('messageInput').value.trim();
+        if (!senderName || !content) return;
+
+        const chatMessage = { sender: senderName, content: content };
+        stompClient.send("/app/sendMessage", {}, JSON.stringify(chatMessage));
+        document.getElementById('messageInput').value = '';
+    }
+
+    document.getElementById('sendMessage').addEventListener('click', sendMessage);
+    window.onload = connect;
+</script>
+</body>
+</html>
